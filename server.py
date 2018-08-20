@@ -77,8 +77,11 @@ class DT_Response(object):
             self.Header = struct.pack(">hhhhbbbbb", self.Magic_No, self.Packet_Type, 
                                       self.Language_Code, self.Year, self.Month,
                                       self.Day, self.Hour, self.Minute, self.Length)
-            self.Body = struct.pack("I", len(self.Text)) + self.Text
+            self.Body = struct.pack("%ds" % (self.Length,), self.Text)
             self.Packet = self.Header + self.Body
+            #print(self.Header)
+            #print(self.Body)
+            #print(self.Packet)
             return self.Packet
         else:
             return False # discard the packet without further action
@@ -115,6 +118,8 @@ class DT_Response(object):
                 
         self.Text = self.Text.encode('utf-8')
         self.Length = len(self.Text)
+        if self.Length > 255:
+            print("Text is too long...Terminating...") # return to the start of the loop??
         #print(self.Text)
         
     def convert_month(self):
@@ -177,7 +182,7 @@ def main():
             print("Sender port:", sock.getsockname()[1]) # gets the senders port to determine language
             print("-"*40)
             
-            if request_check(data):
+            if request_check(data): # DT_Request being checked for validity
                 magic_no, packet_type, date_time_code = get_request(data)
                 sender_port = sock.getsockname()[1]
                 

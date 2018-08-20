@@ -32,13 +32,51 @@ class DT_Request(object):
             return False # discard the packet without further action'
         
 def get_response(packet):
-    """gets data from the packet"""
-    header, body = packet[:13], packet[14:]
-    text = body.rstrip(b'\x00').decode("utf_8")
+    """gets data from the packet and checks if it is a valid response packet"""
+    header, body = packet[:13], packet[13:]
+    text = body.decode("utf_8")
+    #print(header)
+    #print(body)
     
     magic_no, packet_type, language_code, year, month, day, hour, minute, length = struct.unpack(">hhhhbbbbb", header)
-    return magic_no, packet_type, language_code, year, month, day, hour, minute, length, text    
+    length_of_header = len(header)
+    length_of_packet = length_of_header + length
+    
+    valid = check_response(length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length)
+    if valid:
+        return magic_no, packet_type, language_code, year, month, day, hour, minute, length, text  
+    else:
+        print("Invalid packet...Terminating...")
+        sys.exit()
 
+def check_response(length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length):
+    """ checking validity of header response packet. called in get response when 
+    unpacking response from server"""
+    while True:
+        if length_of_header < 13: # need to check, at least 13? or should be 13 exact
+            break
+        if magic_no != 0x497E:
+            break
+        if packet_type != 0x0002: # processes only DT_Response packets
+            break
+        if language_code != 0x0001 and language_code != 0x0002 and language_code != 0x0003:
+            break
+        if year > 2100:
+            break
+        if month < 1 and month > 12:
+            break
+        if day < 1 and day > 31:
+            break
+        if hour < 0 and hour > 23:
+            break
+        if minute < 0 and minute > 59:
+            break
+        if length_of_packet != (13 + length):  
+            break
+        else:
+            return True # passes all checks!
+    return False
+    
 def print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text):
     print()
     print("--------[Packet Information]--------")
@@ -80,7 +118,7 @@ def main():
         except (socket.error, socket.gaierror):
             print("Invalid Host name address, quiting...")
             sleep(5)
-            quit()
+            sys.exit()
             
     ## https://docs.python.org/3/library/socket.html#socket.SOCK_DGRAM
     sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # opens a UDP socket
@@ -108,12 +146,14 @@ def main():
                 try:
                     data, addr = sock_out.recvfrom(1024)
                     print("Received from server:", data)
+                    # response is unpacked and validated
                     magic_no, packet_type, language_code, year, month, day, hour, minute, length, text = get_response(data)
                     
                     print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text)
+                    sys.exit()
                     
                 except socket.timeout:
-                    print("Waited too long...")
+                    print("Timeout error...")
                     
                 running_flag = False
             else:
