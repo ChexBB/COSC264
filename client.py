@@ -139,9 +139,13 @@ def main():
         request_type = 0x0002
 
     ## https://docs.python.org/3/library/socket.html#socket.SOCK_DGRAM
-    sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # opens a UDP socket
-    sock_out.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    # sock_out.bind((UDP_IP, UDP_PORT))
+    try:
+        sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # opens a UDP socket
+        sock_out.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # sock_out.bind((UDP_IP, UDP_PORT))
+    except socket.error:
+        print("Error opening port...Terminating...")
+        sys.exit()
 
     running = True
     while running:
@@ -170,7 +174,8 @@ def main():
     print("Transmission terminated...\n")
     sock_out.close()
     sys.exit()
-    
+
+
 if __name__ == "__main__":
     main()        
 

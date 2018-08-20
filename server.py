@@ -184,20 +184,24 @@ def main():
         print("All port numbers must be unique!")
         sys.exit()
 
-    # opening three sockets for each language request
-    sock_eng = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # English
-    sock_mao = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Te reo Maori
-    sock_ger = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # German
+    try:
+        # opening three sockets for each language request
+        sock_eng = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # English
+        sock_mao = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Te reo Maori
+        sock_ger = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # German
 
-    # set each socket
-    sock_eng.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock_mao.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock_ger.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # set each socket
+        sock_eng.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock_mao.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock_ger.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # binding each socket to a port
-    sock_eng.bind((UDP_IP, UDP_PORT_1))
-    sock_mao.bind((UDP_IP, UDP_PORT_2))
-    sock_ger.bind((UDP_IP, UDP_PORT_3))
+        # binding each socket to a port
+        sock_eng.bind((UDP_IP, UDP_PORT_1))
+        sock_mao.bind((UDP_IP, UDP_PORT_2))
+        sock_ger.bind((UDP_IP, UDP_PORT_3))
+    except socket.error:
+        print("Error opening / binding ports...Terminating...")
+        sys.exit()
 
     running = True
     while running:
@@ -252,4 +256,5 @@ def main():
         
 
 if __name__ == "__main__":
-    main()   
+    main()
+
