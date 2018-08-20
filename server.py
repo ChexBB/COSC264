@@ -119,7 +119,7 @@ class DT_Response(object):
         self.Text = self.Text.encode('utf-8')
         self.Length = len(self.Text)
         if self.Length > 255:
-            print("Text is too long...Terminating...") # return to the start of the loop??
+            print("Text is too long...Terminating...")  # return to the start of the loop??
         #print(self.Text)
         
     def convert_month(self):
@@ -137,7 +137,7 @@ def request_check(packet):
     """checks if the request packet is valid"""
     magic_no, packet_type, request_type = get_request(packet)
     length_of_packet = struct.calcsize('>hhh')
-     # checks if packet is 6 bytes and valid magic no, packet type and request type
+    # checks if packet is 6 bytes and valid magic no, packet type and request type
     if length_of_packet == 6 and magic_no == 0x497E and packet_type == 0x0001 and (request_type == 0x0001 or request_type == 0x0002):
         return True
     else:
@@ -146,39 +146,69 @@ def request_check(packet):
 def get_request(packet):
     """gets data from the packet"""
     magic_no, packet_type, request_type = struct.unpack('>hhh', packet)
-    return magic_no, packet_type, request_type     
-    
+    return magic_no, packet_type, request_type
+
     
 def main():
     
     UDP_IP = "127.0.0.1"
     
-    UDP_PORT_1 = int(sys.argv[1]) 
-    UDP_PORT_2 = int(sys.argv[2]) 
-    UDP_PORT_3 = int(sys.argv[3]) 
-    
-    # needs some validity checks
-    
+    UDP_PORT_1 = sys.argv[1]
+    UDP_PORT_2 = sys.argv[2]
+    UDP_PORT_3 = sys.argv[3]
+
+    try:
+        UDP_PORT_1 = int(UDP_PORT_1)
+        UDP_PORT_2 = int(UDP_PORT_2)
+        UDP_PORT_3 = int(UDP_PORT_3)
+    except:
+        # all ports must be an integer
+        print("All ports must be integers!")
+        sys.exit()
+
+    # port in range checks
+    if UDP_PORT_1 < 1024 or UDP_PORT_1 > 64000:
+        print("Port 1 out of range!")
+        sys.exit()
+
+    if UDP_PORT_2 < 1024 or UDP_PORT_2 > 64000:
+        print("Port 2 out of range!")
+        sys.exit()
+
+    if UDP_PORT_3 < 1024 or UDP_PORT_3 > 64000:
+        print("Port 3 out of range!")
+        sys.exit()
+
+    # checks for port uniqueness
+    if len({UDP_PORT_1, UDP_PORT_2, UDP_PORT_3}) != 3:
+        print("All port numbers must be unique!")
+        sys.exit()
+
+    # opening three sockets for each language request
     sock_eng = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # English
     sock_mao = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # Te reo Maori
     sock_ger = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # German
-    
+
+    # set each socket
     sock_eng.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock_mao.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock_ger.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    
+
+    # binding each socket to a port
     sock_eng.bind((UDP_IP, UDP_PORT_1))
     sock_mao.bind((UDP_IP, UDP_PORT_2))
     sock_ger.bind((UDP_IP, UDP_PORT_3))
-    
-    while True:
+
+    running = True
+    while running:
         # block until at least one socket is ready
         ready_sockets, _, _ = select.select([sock_eng, sock_mao, sock_ger], [], [])
         for sock in ready_sockets:
             data, addr = sock.recvfrom(1024)
+
             print("-"*40)
             print("received message:", data)
-            print("received IP:", addr[0]) # need to be serders IP or this one? 
+            print("received IP:", addr[0]) # need to be senders IP or this one?
             print("Sender port:", sock.getsockname()[1]) # gets the senders port to determine language
             print("-"*40)
             
@@ -198,20 +228,28 @@ def main():
                 response.encode()
                 RESPONSE = response.Packet
                 #print("Full response to be sent:", RESPONSE)
-                # sending back to client
-                sock.sendto(RESPONSE, (addr[0], addr[1]))
-                print("Transmission sent...")
+
+                # sending response packet back to client
+                try:
+                    sock.sendto(RESPONSE, (addr[0], addr[1]))
+                    print("Transmission sent...")
+                except:
+                    print("Error sending request to client...")
+                    # running = False
+                    continue
 
             else:
                 print("Received packet is not valid... Terminating... ")
+                # running = False
+                continue
                 
-    # remember to close all 3 sockets before exiting program
+    # close all 3 sockets before exiting program
     sock_eng.close()
     sock_mao.close()
     sock_ger.close()
+    print("Goodbye!")
+    sys.exit()
         
 
 if __name__ == "__main__":
     main()   
-    
-    

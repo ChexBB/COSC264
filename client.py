@@ -78,7 +78,6 @@ def check_response(length_of_header, length_of_packet, magic_no, packet_type, la
     return False
     
 def print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text):
-    print()
     print("--------[Packet Information]--------")
     print("Magic Number:", magic_no)
     print("Packet Type:", packet_type)
@@ -101,11 +100,14 @@ def print_results(magic_no, packet_type, language_code, year, month, day, hour, 
     
 
 def main():
-    # might need to restructure main into try catch format?
-    running_flag = True
     dateTime = sys.argv[1]
     UDP_IP = sys.argv[2]
-    UDP_PORT = int(sys.argv[3])
+    UDP_PORT = sys.argv[3]
+
+    # checking for valid date or time request
+    if dateTime != "date" and dateTime != "time":
+        print("Must enter either 'date' or 'time'!")
+        sys.exit()
     
     # checking for valid hostname (need to fix!)
     try:
@@ -119,53 +121,55 @@ def main():
             print("Invalid Host name address, quiting...")
             sleep(5)
             sys.exit()
-            
-    ## https://docs.python.org/3/library/socket.html#socket.SOCK_DGRAM
-    sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # opens a UDP socket
-    
-    while running_flag: 
-        if dateTime == "date" or dateTime == "time":
-            if dateTime == "date":
-                request_type = 0x0001
-            elif dateTime == "time":
-                request_type = 0x0002
-            # need some processing here?
-            
-            if UDP_PORT >= 1024 and UDP_PORT <= 64000:
-                # valid request
-                print("Valid request...")
-                
-                packet = DT_Request(0x497E, 0x0001, request_type) # prepares DT-Request
-                REQUEST = packet.Packet # returns the bytearray of the packet
-                #print(REQUEST)                
-                
-                #sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # opens a UDP socket
-                sock_out.sendto(REQUEST, (UDP_IP, UDP_PORT))
-                
-                sock_out.settimeout(1) # wait for 1 second for a response packet.
-                try:
-                    data, addr = sock_out.recvfrom(1024)
-                    print("Received from server:", data)
-                    # response is unpacked and validated
-                    magic_no, packet_type, language_code, year, month, day, hour, minute, length, text = get_response(data)
-                    
-                    print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text)
-                    sys.exit()
-                    
-                except socket.timeout:
-                    print("Timeout error...")
-                    
-                running_flag = False
-            else:
-                print("Invalid port...")
-                running_flag = False
-        else:
-            print("Error, closing...")
-            running_flag = False
-            
-        print("Transmission terminated...")
-        sock_out.close()
 
+    # checks that port is an integer
+    try:
+        UDP_PORT = int(UDP_PORT)
+    except:
+        print("Port must be an integer!")
+        sys.exit()
+
+    if UDP_PORT < 1024 or UDP_PORT > 64000:
+        print("Port is out of range!")
+        sys.exit()
+
+    if dateTime == "date":
+        request_type = 0x0001
+    elif dateTime == "time":
+        request_type = 0x0002
+
+    ## https://docs.python.org/3/library/socket.html#socket.SOCK_DGRAM
+    sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # opens a UDP socket
+    sock_out.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # sock_out.bind((UDP_IP, UDP_PORT))
+
+    running = True
+    while running:
+        packet = DT_Request(0x497E, 0x0001, request_type)  # prepares DT-Request packet
+        REQUEST = packet.Packet  # returns the byte array of the packet
+        try:
+            sock_out.sendto(REQUEST, (UDP_IP, UDP_PORT))
+            print("Request sent...\n")
+        except:  # need to be more specific with socket errors?
+            print("Error sending request to server...")
+            break
+
+        sock_out.settimeout(1) # wait for 1 second for a response packet.
+        try:
+            data, addr = sock_out.recvfrom(1024)
+            # print("Received from server:", data)
+            # response is unpacked and validated in get_response
+            magic_no, packet_type, language_code, year, month, day, hour, minute, length, text = get_response(data)
+            print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text)
+            running = False  # prints then exits
+
+        except socket.timeout:
+            print("Timeout error...\n")
+            running = False
+            
+    print("Transmission terminated...\n")
+    sock_out.close()
+    sys.exit()
     
 if __name__ == "__main__":
     main()        
