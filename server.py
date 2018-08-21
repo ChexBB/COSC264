@@ -7,20 +7,20 @@ import datetime
 class DT_Response(object):
     """Creates an instance of a DT_Request packet"""
     def __init__(self, language):
-        """initializes the bytes"""
-        self.Magic_No = 0x497E
-        self.Packet_Type = 0x0002
-        self.Language_Code = language
-        self.Year = None
-        self.Day = None
-        self.Hour = None
-        self.Minute = None
-        self.Length = None
-        self.Text = None
-        self.Packet = None
-        self.Header = None
-        self.Body = None
-        self.valid_packet = False
+        """initialize"""
+        self.magic_no = 0x497E
+        self.packet_type = 0x0002
+        self.language_code = language
+        self.year = None
+        self.month = None
+        self.day = None
+        self.hour = None
+        self.minute = None
+        self.length = None
+        self.text = None
+        self.packet = None
+        self.header = None
+        self.body = None
         self.english = {1:"January",
                         2:"February", 
                         3:"March", 
@@ -60,78 +60,72 @@ class DT_Response(object):
                       11:"November",
                       12:"Dezember"}    
         
-        # checks the validity of the packt on initialization
-        self.check()
-        
     def check(self):
         """checks if the packet is valid"""
-        if self.Magic_No == 0x497E and self.Packet_Type == 0x0002:
-            self.valid_packet = True
-            return self.valid_packet
+        if self.magic_no == 0x497E and self.packet_type == 0x0002:
+            return True
         else:
-            raise Exception("Invalid packet")
+            print("Invalid packet...Terminating...\n")
+            return False
             
     def encode(self):
         """packs all the bytes into a single packet"""
-        if self.valid_packet == True:
-            self.Header = struct.pack(">hhhhbbbbb", self.Magic_No, self.Packet_Type, 
-                                      self.Language_Code, self.Year, self.Month,
-                                      self.Day, self.Hour, self.Minute, self.Length)
-            self.Body = struct.pack("%ds" % (self.Length,), self.Text)
-            self.Packet = self.Header + self.Body
-            #print(self.Header)
-            #print(self.Body)
-            #print(self.Packet)
-            return self.Packet
+        if self.check:
+            self.header = struct.pack(">hhhhbbbbb", self.magic_no, self.packet_type, 
+                                      self.language_code, self.year, self.month,
+                                      self.day, self.hour, self.minute, self.length)
+            self.body = struct.pack("%ds" % (self.length,), self.text)
+            self.packet = self.header + self.body
+            return self.packet
         else:
             return False # discard the packet without further action
         
     def textual_representation(self, request):
         """returns a date or time representation based on the request made"""
         now = datetime.datetime.now()
-        self.Year = now.year
-        self.Month = now.month
-        self.Day = now.day
-        self.Hour = now.hour
-        self.Minute = now.minute
+        self.year = now.year
+        self.month = now.month
+        self.day = now.day
+        self.hour = now.hour
+        self.minute = now.minute
         
-        #print("Language", self.Language_Code)
-        #print("Request", request)
-        if self.Language_Code == 0x0001:
+        if self.language_code == 0x0001:
             if request == 1:
                 proper_month = self.convert_month()
-                self.Text = "Today's date is " + proper_month + ' ' + str(self.Day) + ', ' + str(self.Year)
+                self.text = "Today's date is " + proper_month + ' ' + str(self.day) + ', ' + str(self.year)
             elif request == 2:
-                self.Text = "The current time is " + str(self.Hour) + ':' + str(self.Minute)
-        elif self.Language_Code == 0x0002:
+                self.text = "The current time is " + str(self.hour) + ':' + str(self.minute)
+        elif self.language_code == 0x0002:
             if request == 1:
                 proper_month = self.convert_month()
-                self.Text = "Ko te ra o tenei ra ko " + proper_month + ' ' + str(self.Day) + ', ' + str(self.Year)
+                self.text = "Ko te ra o tenei ra ko " + proper_month + ' ' + str(self.day) + ', ' + str(self.year)
             elif request == 2:
-                self.Text = "Ko te wa o tenei wa " + str(self.Hour) + ':' + str(self.Minute)          
-        elif self.Language_Code == 0x0003:
+                self.text = "Ko te wa o tenei wa " + str(self.hour) + ':' + str(self.minute)          
+        elif self.language_code == 0x0003:
             if request == 1:
                 proper_month = self.convert_month()
-                self.Text = "Heute ist der " + proper_month + ' ' + str(self.Day) + ', ' + str(self.Year)
+                self.text = "Heute ist der " + proper_month + ' ' + str(self.day) + ', ' + str(self.year)
             elif request == 2:
-                self.Text = "Die Uhrzeit ist " + str(self.Hour) + ':' + str(self.Minute)     
+                self.text = "Die Uhrzeit ist " + str(self.hour) + ':' + str(self.minute)     
                 
-        self.Text = self.Text.encode('utf-8')
-        self.Length = len(self.Text)
-        if self.Length > 255:
-            print("Text is too long...Terminating...")  # return to the start of the loop??
-        #print(self.Text)
+        self.text = self.text.encode('utf-8')
+        self.length = len(self.text)
+        if self.length <= 255:  # checking for valid text length
+            return True
+        else:
+            print("Text is too long...")
+            return False
         
     def convert_month(self):
         """returns the proper name of a month in the specified language"""
-        if self.Language_Code == 0x0001:
-            return self.english[self.Month]
+        if self.language_code == 0x0001:
+            return self.english[self.month]
         
-        elif self.Language_Code == 0x0002:
-            return self.maori[self.Month]   
+        elif self.language_code == 0x0002:
+            return self.maori[self.month]   
         
-        elif self.Language_Code == 0x0003:
-            return self.german[self.Month]
+        elif self.language_code == 0x0003:
+            return self.german[self.month]
            
 def request_check(packet):
     """checks if the request packet is valid"""
@@ -150,37 +144,36 @@ def get_request(packet):
 
     
 def main():
+    udp_ip = "127.0.0.1"
     
-    UDP_IP = "127.0.0.1"
-    
-    UDP_PORT_1 = sys.argv[1]
-    UDP_PORT_2 = sys.argv[2]
-    UDP_PORT_3 = sys.argv[3]
+    udp_ip_1 = sys.argv[1]
+    udp_ip_2 = sys.argv[2]
+    udp_ip_3 = sys.argv[3]
 
     try:
-        UDP_PORT_1 = int(UDP_PORT_1)
-        UDP_PORT_2 = int(UDP_PORT_2)
-        UDP_PORT_3 = int(UDP_PORT_3)
+        udp_ip_1 = int(udp_ip_1)
+        udp_ip_2 = int(udp_ip_2)
+        udp_ip_3 = int(udp_ip_3)
     except:
         # all ports must be an integer
         print("All ports must be integers!")
         sys.exit()
 
     # port in range checks
-    if UDP_PORT_1 < 1024 or UDP_PORT_1 > 64000:
+    if udp_ip_1 < 1024 or udp_ip_1 > 64000:
         print("Port 1 out of range!")
         sys.exit()
 
-    if UDP_PORT_2 < 1024 or UDP_PORT_2 > 64000:
+    if udp_ip_2 < 1024 or udp_ip_2 > 64000:
         print("Port 2 out of range!")
         sys.exit()
 
-    if UDP_PORT_3 < 1024 or UDP_PORT_3 > 64000:
+    if udp_ip_3 < 1024 or udp_ip_3 > 64000:
         print("Port 3 out of range!")
         sys.exit()
 
     # checks for port uniqueness
-    if len({UDP_PORT_1, UDP_PORT_2, UDP_PORT_3}) != 3:
+    if len({udp_ip_1, udp_ip_2, udp_ip_3}) != 3:
         print("All port numbers must be unique!")
         sys.exit()
 
@@ -196,9 +189,9 @@ def main():
         sock_ger.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         # binding each socket to a port
-        sock_eng.bind((UDP_IP, UDP_PORT_1))
-        sock_mao.bind((UDP_IP, UDP_PORT_2))
-        sock_ger.bind((UDP_IP, UDP_PORT_3))
+        sock_eng.bind((udp_ip, udp_ip_1))
+        sock_mao.bind((udp_ip, udp_ip_2))
+        sock_ger.bind((udp_ip, udp_ip_3))
     except socket.error:
         print("Error opening / binding ports...Terminating...")
         sys.exit()
@@ -212,40 +205,41 @@ def main():
 
             print("-"*40)
             print("received message:", data)
-            print("received IP:", addr[0]) # need to be senders IP or this one?
+            print("Sender IP:", sock.getsockname()[0])
             print("Sender port:", sock.getsockname()[1]) # gets the senders port to determine language
             print("-"*40)
             
             if request_check(data): # DT_Request being checked for validity
                 magic_no, packet_type, date_time_code = get_request(data)
-                sender_port = sock.getsockname()[1]
+                sender_port = sock.getsockname()[1]  # gets the port of the sender
                 
-                if sender_port == UDP_PORT_1:
+                # assigns the language for the response based on senders port
+                if sender_port == udp_ip_1:
                     language_code = 0x0001
-                elif sender_port == UDP_PORT_2:
+                elif sender_port == udp_ip_2:
                     language_code = 0x0002
-                elif sender_port == UDP_PORT_3:
+                elif sender_port == udp_ip_3:
                     language_code = 0x0003
                     
+                # preparing a DT_Response 
                 response = DT_Response(language_code)
-                response.textual_representation(date_time_code)
-                response.encode()
-                RESPONSE = response.Packet
-                #print("Full response to be sent:", RESPONSE)
-
-                # sending response packet back to client
-                try:
-                    sock.sendto(RESPONSE, (addr[0], addr[1]))
-                    print("Transmission sent...")
-                except:
-                    print("Error sending request to client...")
-                    # running = False
+                # checking if response is valid
+                if response.check() and response.textual_representation(date_time_code):
+                    response.encode()  # encode header and text into byte array
+                    RESPONSE = response.packet
+                    
+                    try: # attempting to send response packet back to client
+                        sock.sendto(RESPONSE, (addr[0], addr[1]))
+                        print("Transmission sent...")
+                    except:
+                        print("Error sending request to client...")
+                        continue 
+                else:
+                    print("Invalid response packet...")
                     continue
-
             else:
-                print("Received packet is not valid... Terminating... ")
-                # running = False
-                continue
+                print("Received packet is not valid...")
+                continue # continue at start of loop
                 
     # close all 3 sockets before exiting program
     sock_eng.close()
@@ -257,4 +251,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

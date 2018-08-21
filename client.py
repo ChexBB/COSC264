@@ -5,29 +5,27 @@ import sys
 class DT_Request(object):
     """Creates an instance of a DT_Request packet"""
     def __init__(self, magic_no, packet_type, request_type):
-        """initializes the bytes"""
-        self.Magic_No = magic_no
-        self.Packet_Type = packet_type
-        self.Request_Type = request_type
-        self.Packet = None
-        self.valid_packet = False
-        
-        self.check()
+        """initialize"""
+        self.magic_no = magic_no
+        self.packet_type = packet_type
+        self.request_type = request_type
+        self.packet = None
+        self.check()  # check and then encode if valid
         self.encode()
         
     def check(self):
         """checks if the packet is valid"""
-        if self.Magic_No == 0x497E and self.Packet_Type == 0x0001 and (self.Request_Type == 0x0001 or self.Request_Type == 0x0002):
-            self.valid_packet = True
-            return self.valid_packet
+        if self.magic_no == 0x497E and self.packet_type == 0x0001 and (self.request_type == 0x0001 or self.request_type == 0x0002):
+            return True
         else:
-            raise Exception("Invalid packet")
+            print("Invalid packet...Terminating...\n")
+            sys.exit()
             
     def encode(self):
         """packs all the bytes into a single packet"""
-        if self.valid_packet == True:
-            self.Packet = struct.pack(">hhh", self.Magic_No, self.Packet_Type, self.Request_Type)
-            return self.Packet
+        if self.check:
+            self.packet = struct.pack(">hhh", self.magic_no, self.packet_type, self.request_type)
+            return self.packet
         else:
             return False # discard the packet without further action
         
@@ -35,29 +33,22 @@ def get_response(packet):
     """gets data from the packet and checks if it is a valid response packet"""
     header, body = packet[:13], packet[13:]
     text = body.decode("utf_8")
-    #print(header)
-    #print(body)
     
     magic_no, packet_type, language_code, year, month, day, hour, minute, length = struct.unpack(">hhhhbbbbb", header)
     length_of_header = len(header)
     length_of_packet = length_of_header + length
     
-    valid = check_response(length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length)
-    if valid:
-        return magic_no, packet_type, language_code, year, month, day, hour, minute, length, text  
-    else:
-        print("Invalid packet...Terminating...")
-        sys.exit()
+    return length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length, text  
 
 def check_response(length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length):
     """ checking validity of header response packet. called in get response when 
     unpacking response from server"""
     while True:
-        if length_of_header < 13: # need to check, at least 13? or should be 13 exact
+        if length_of_header < 13:
             break
         if magic_no != 0x497E:
             break
-        if packet_type != 0x0002: # processes only DT_Response packets
+        if packet_type != 0x0002:  # processes only DT_Response packets
             break
         if language_code != 0x0001 and language_code != 0x0002 and language_code != 0x0003:
             break
@@ -78,9 +69,9 @@ def check_response(length_of_header, length_of_packet, magic_no, packet_type, la
     return False
     
 def print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text):
-    print("--------[Packet Information]--------")
+    print("--------[packet Information]--------")
     print("Magic Number:", magic_no)
-    print("Packet Type:", packet_type)
+    print("packet Type:", packet_type)
     print("Language Code:", language_code)
     print("------------------------------------")
     print()
@@ -100,83 +91,93 @@ def print_results(magic_no, packet_type, language_code, year, month, day, hour, 
     
 
 def main():
-    dateTime = sys.argv[1]
-    UDP_IP = sys.argv[2]
-    UDP_PORT = sys.argv[3]
+    magic_number = 0x497E
+    packet_type = 0x0001
+    
+    date_time = sys.argv[1]
+    udp_ip = sys.argv[2]
+    udp_port = sys.argv[3]
 
     # checking for valid date or time request
-    if dateTime != "date" and dateTime != "time":
+    if date_time != "date" and date_time != "time":
         print("Must enter either 'date' or 'time'!")
         sys.exit()
     
     # checking valid IP and hostname
     try:
-        socket.inet_aton(UDP_IP)
+        socket.inet_aton(udp_ip)
     except OSError:
-        # if hostname like datetime.mydomain is entered, IP address of server
+        # if hostname like date_time.mydomain is entered, IP address of server
         # converted to dotted decimal notation
         try:
-            info_list = socket.getaddrinfo(UDP_IP, UDP_PORT)
-            UDP_IP = info_list[0][4][0]
-            #print(UDP_IP)
-        except (OSError, socket.gaierror):
-            print("Invalid Host name address...terminating...")
-            sys.exit()            
+            info_list = socket.getaddrinfo(udp_ip, udp_port)
+            udp_ip = info_list[0][4][0]
+        except (OSError, socket.gaierror):  # checking if hostname exists
+            print("Host name does not exist...terminating...\n")
+            sys.exit()  
+        except UnicodeError:  # checking for properly formed ip in DotDecimalNotation
+            print("IP address not well formed...terminating...\n")
+            sys.exit()
 
     # checks that port is an integer
     try:
-        UDP_PORT = int(UDP_PORT)
+        udp_port = int(udp_port)
     except:
         print("Port must be an integer!")
         sys.exit()
 
-    if UDP_PORT < 1024 or UDP_PORT > 64000:
+    if udp_port < 1024 or udp_port > 64000:  # checks the port is in range
         print("Port is out of range!")
         sys.exit()
-
-    if dateTime == "date":
+        
+    # sets user input of date / time to request type
+    if date_time == "date":
         request_type = 0x0001
-    elif dateTime == "time":
+    elif date_time == "time":
         request_type = 0x0002
-
-    ## https://docs.python.org/3/library/socket.html#socket.SOCK_DGRAM
+        
+    # client tries opening up a udp socket
     try:
         sock_out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # opens a UDP socket
         sock_out.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # sock_out.bind((UDP_IP, UDP_PORT))
+        # sock_out.bind((udp_ip, udp_port))
     except socket.error:
         print("Error opening port...Terminating...")
         sys.exit()
 
     running = True
     while running:
-        packet = DT_Request(0x497E, 0x0001, request_type)  # prepares DT-Request packet
-        REQUEST = packet.Packet  # returns the byte array of the packet
+        packet = DT_Request(magic_number, packet_type, request_type)  # prepares DT-Request packet
+        REQUEST = packet.packet  # returns the byte array of the packet header
         try:
-            sock_out.sendto(REQUEST, (UDP_IP, UDP_PORT))
-            print("Request sent...\n")
-        except:  # need to be more specific with socket errors?
+            sock_out.sendto(REQUEST, (udp_ip, udp_port))  # packet request sent to server
+            print("--------[Transmission Sent]---------\n")
+        except:
             print("Error sending request to server...")
             break
 
         sock_out.settimeout(1) # wait for 1 second for a response packet.
-        try:
+        print("Waiting for response...\n")
+        try:  # try to receive response from server
             data, addr = sock_out.recvfrom(1024)
-            # print("Received from server:", data)
-            # response is unpacked and validated in get_response
-            magic_no, packet_type, language_code, year, month, day, hour, minute, length, text = get_response(data)
-            print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text)
-            running = False  # prints then exits
+            # response is unpacked in get_response and then checked if valid
+            length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length, text = get_response(data)
+            if check_response(length_of_header, length_of_packet, magic_no, packet_type, language_code, year, month, day, hour, minute, length):
+                print("Success: Relaying response...")
+                print_results(magic_no, packet_type, language_code, year, month, day, hour, minute, length, text)
+                running = False  # prints then exits                 
+            else:
+                print("Invalid packet...\n")
+                running = False
 
-        except socket.timeout:
+        except socket.timeout:  # if client waits longer than a second; program exits
             print("Timeout error...\n")
             running = False
             
-    print("Transmission terminated...\n")
+    print("-----[Transmission Terminated]------")
     sock_out.close()
     sys.exit()
 
 
 if __name__ == "__main__":
     main()        
-
