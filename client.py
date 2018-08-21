@@ -29,7 +29,7 @@ class DT_Request(object):
             self.Packet = struct.pack(">hhh", self.Magic_No, self.Packet_Type, self.Request_Type)
             return self.Packet
         else:
-            return False # discard the packet without further action'
+            return False # discard the packet without further action
         
 def get_response(packet):
     """gets data from the packet and checks if it is a valid response packet"""
@@ -109,18 +109,19 @@ def main():
         print("Must enter either 'date' or 'time'!")
         sys.exit()
     
-    # checking for valid hostname (need to fix!)
+    # checking valid IP and hostname
     try:
         socket.inet_aton(UDP_IP)
-    except socket.error:
-        info_list = socket.getaddrinfo(UDP_IP, 'www')
-        UDP_IP = info_list[0][4][0]
+    except OSError:
+        # if hostname like datetime.mydomain is entered, IP address of server
+        # converted to dotted decimal notation
         try:
-            socket.inet_aton(UDP_IP)
-        except (socket.error, socket.gaierror):
-            print("Invalid Host name address, quiting...")
-            sleep(5)
-            sys.exit()
+            info_list = socket.getaddrinfo(UDP_IP, UDP_PORT)
+            UDP_IP = info_list[0][4][0]
+            #print(UDP_IP)
+        except (OSError, socket.gaierror):
+            print("Invalid Host name address...terminating...")
+            sys.exit()            
 
     # checks that port is an integer
     try:
